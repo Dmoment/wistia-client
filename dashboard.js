@@ -7,7 +7,7 @@ var Dashboard = {
   },
 
   getRailsVideos: function() {
-    // Fetch video data from Rails API to get visibility status
+    // Fetch video data from Rails API to get visibility status and tags
     var railsApiUrl = 'http://localhost:3000/api/v1/videos';
     return axios.get(railsApiUrl);
   },
@@ -25,7 +25,8 @@ var Dashboard = {
           return {
             ...wistiaVideo,
             visible: railsVideo ? railsVideo.visible : false,
-            playCount: railsVideo.play_count
+            playCount: railsVideo ? railsVideo.play_count : 0,
+            tags: railsVideo ? railsVideo.tags : [] // Include tags from Rails API
           };
         });
 
@@ -38,7 +39,7 @@ var Dashboard = {
     var clone = template.content.cloneNode(true);
     var tagEl = clone.children[0];
 
-    tagEl.innerText = tag;
+    tagEl.innerText = tag.name; // Updated to show tag name from Rails API
     mediaEl.querySelector('.tags').append(tagEl);
   },
 
@@ -70,7 +71,7 @@ var Dashboard = {
       hiddenIcon.style.display = 'inline';
     }
 
-    this.renderTags(el, media.tags || []);
+    this.renderTags(el, media.tags || []); // Render associated tags
 
     document.getElementById('medias').appendChild(el);
   },
@@ -105,17 +106,32 @@ var Dashboard = {
       });
   },
 
-  openModal: function() {
+  openModal: function(videoId) {
     document.querySelector('.modal').classList.add('modal--open');
+    document.querySelector('.modal').setAttribute('data-video-id', videoId);
   },
 
   closeModal: function() {
     document.querySelector('.modal').classList.remove('modal--open');
   },
 
-  addTag: function() {
-    var el = document.createElement('li');
-    el.querySelector('.tags').appendChild(el);
+  addTag: function(videoId, tagName) {
+    axios
+      .post(`http://localhost:3000/api/v1/videos/${videoId}/video_tags`, {
+        tag: { name: tagName }
+      })
+      .then(function(response) {
+        Dashboard.closeModal();
+
+        // Add the tag to the appropriate video on the UI
+        const videoEl = document.querySelector(`[data-hashed-id="${videoId}"]`);
+        if (videoEl) {
+          Dashboard.renderTag(videoEl, response.data);
+        }
+      })
+      .catch(function(error) {
+        console.error('Failed to add tag:', error);
+      });
   }
 };
 
@@ -141,7 +157,8 @@ var Dashboard = {
       }
 
       if (event && event.target.matches('.tag-button')) {
-        Dashboard.openModal();
+        const videoId = event.target.closest('.media').getAttribute('data-hashed-id');
+        Dashboard.openModal(videoId);
       }
 
       if (event && event.target.matches('.modal__button--close')) {
@@ -150,4 +167,15 @@ var Dashboard = {
     },
     { useCapture: true }
   );
+
+  document.getElementById('tag-form').addEventListener('submit', function(event) {
+    event.preventDefault();
+
+    const tagName = document.getElementById('tag-name').value.trim();
+    const videoId = document.querySelector('.modal').getAttribute('data-video-id');
+
+    if (tagName && videoId) {
+      Dashboard.addTag(videoId, tagName);
+    }
+  });
 })();
