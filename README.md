@@ -130,7 +130,7 @@ The video application has two views:
 
 **Wistia Sync:**
 
-- Added a rake task to sync videos with Wistia.
+- Added a rake task to sync videos with Wistia. (You can find the service which is used to fetch data from Wistia APIs here - services/WistiaService). There is a class method - sync_with_wistia in Video model which populates our DB videos table. We can have this rake task in scheduled job which can run after every 15-20 minutes so that we can have updated data.
 
 - Stored basic video information and updated play count from Wistia Stats API.
 
@@ -156,7 +156,7 @@ The video application has two views:
 
 **Dual API Data Source:**
 
-Combined Wistia and Rails API data for the playlist and dashboard to ensure visibility and play count data is synced and managed efficiently.
+Combined Wistia and Rails API data for the playlist and dashboard to ensure visibility and play count data is synced and managed efficiently. From Rails API we are sending play_count, visible and hashed_id and other video data is coming from wistia API directly on frontend.
 
 **Countdown Implementation:**
 
