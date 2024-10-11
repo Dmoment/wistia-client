@@ -42,6 +42,7 @@ var Playlist = {
     el.querySelector('.title').innerText = media.name;
     el.querySelector('.duration').innerText = Utils.formatTime(media.duration);
     el.querySelector('.media-content').setAttribute('href', '#wistia_' + media.hashed_id);
+    el.setAttribute('data-hashed-id', media.hashed_id);
 
     document.getElementById('medias').appendChild(el);
   },
@@ -71,6 +72,9 @@ var Playlist = {
         // Play the current video
         videoApi.play();
 
+         // Update UI to show "Playing" overlay for the current video in the list
+         Playlist.updatePlayingOverlay(currentVideo.hashed_id);
+
         // Bind to the timechange event to trigger countdown in the last 5 seconds
         videoApi.bind("timechange", function(t) {
           if (videoApi.duration() - t <= 5 && !countdownStarted) {
@@ -94,6 +98,22 @@ var Playlist = {
         });
       }
     });
+  },
+
+  updatePlayingOverlay: function(currentHashedId) {
+    // Remove "Playing" overlay from all videos first
+    document.querySelectorAll('.media-overlay').forEach(function(overlay) {
+      overlay.classList.add('hidden');
+    });
+  
+    // Show "Playing" overlay for the currently playing video
+    const currentMediaEl = document.querySelector(`[data-hashed-id="${currentHashedId}"]`);
+    if (currentMediaEl) {
+      const playingOverlay = currentMediaEl.querySelector('.thumbnail-container .media-overlay');
+      if (playingOverlay) {
+        playingOverlay.classList.remove('hidden');
+      }
+    }
   }
 };
 

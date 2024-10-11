@@ -36,7 +36,10 @@
   <template id="media-template">
     <li class="media">
       <a class="media-content link--unstyled" href="javascript:void(0)">
-        <img class="thumbnail"/>
+        <div class="thumbnail-container">
+          <img class="thumbnail" />
+          <div class="media-overlay hidden">Playing</div>
+        </div>
         <div class="description">
           <div class="title"></div>
           <div class="duration label--sm"></div>
@@ -44,6 +47,7 @@
       </a>
     </li>
   </template>
+  
 
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <script src="./common.js"></script>
