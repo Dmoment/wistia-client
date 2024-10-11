@@ -115,6 +115,51 @@ The video application has two views:
 - Created an endpoint for updating visibility status.
 
 - Added tag associations to the index method to return tags for each video.
+```
+module Api
+  module V1
+    class VideosController < ApplicationController
+      def index
+        @videos = Video.includes(:tags).where(visible: true)
+        render json: @videos.to_json(include: :tags)
+      end
+
+      def update
+        @video = Video.find_by(wistia_hash: params[:id])
+        if @video.update(video_params)
+          render json: @video
+        else
+          render json: @video.errors, status: :unprocessable_entity
+        end
+      end
+
+      private
+
+      def video_params
+        params.require(:video).permit(:visible)
+      end
+    end
+  end
+end
+
+module Api
+  module V1
+    class VideoTagsController < ApplicationController
+      def create
+        @video = Video.find_by(wistia_hash: params[:video_id])
+        @tag = Tag.find_or_create_by(name: params[:tag][:name])
+
+        if @video && @tag
+          @video.tags << @tag unless @video.tags.include?(@tag)
+          render json: @tag, status: :created
+        else
+          render json: { error: 'Video or Tag not found' }, status: :unprocessable_entity
+        end
+      end
+    end
+  end
+end
+```
 
 **TagsController:**
 
