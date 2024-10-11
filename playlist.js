@@ -5,9 +5,32 @@ var videoQueue = [];
 var countdownStarted = false; // Declare countdownStarted globally
 
 var Playlist = {
-  getMedias: function() {
+  getRailsVideos: function() {
+    // Fetch video data from the Rails API to get visibility status
+    var railsApiUrl = 'http://localhost:3000/api/v1/videos';
+    return axios.get(railsApiUrl);
+  },
+
+  getWistiaMedias: function() {
+    // Fetch video data from the Wistia API
     var url = new URL('https://api.wistia.com/v1/medias.json');
     return axios.get(String(url), { headers: { Authorization: `Bearer ${TOKEN}` } });
+  },
+
+  fetchVideos: function() {
+    // Fetch videos from both APIs
+    return Promise.all([Playlist.getRailsVideos(), Playlist.getWistiaMedias()])
+      .then(function([railsResponse, wistiaResponse]) {
+        const visibleVideos = railsResponse.data; // Data from Rails API
+        const wistiaVideos = wistiaResponse.data; // Data from Wistia API
+
+        // Combine both data sets using the wistia_hash as the key
+        const visibleWistiaVideos = wistiaVideos.filter(wistiaVideo => {
+          return visibleVideos.some(video => video.wistia_hash === wistiaVideo.hashed_id && video.visible);
+        });
+
+        return visibleWistiaVideos;
+      });
   },
 
   renderMedia: function(media) {
@@ -108,8 +131,9 @@ function showCountdownOverlay(nextVideo, callback) {
   document.addEventListener(
     'DOMContentLoaded',
     function() {
-      Playlist.getMedias().then(function(response) {
-        videoQueue = response.data;
+      Playlist.fetchVideos().then(function(visibleWistiaVideos) {
+        videoQueue = visibleWistiaVideos;
+
         if (videoQueue.length === 0) {
           return;
         }
