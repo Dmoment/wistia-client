@@ -267,6 +267,9 @@ To better manage UI states like visibility and playing status, a lightweight sta
 
 The backend could benefit from adding an external caching mechanism like Redis for frequently accessed video or tag data.
 
+**Add Unit Test in Backend**
+I would have used proper API mocking tool like VCR for testing Video data and would have provided complete test coverage
+
 
 ***Conclusion***
 
