@@ -58,7 +58,7 @@ header {
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
   font-size: 20px;
-  z-index: 1000; /* Higher z-index to ensure it appears above the video */
+  z-index: 1000; /* Ensure it appears above the video */
   pointer-events: none; /* Prevent overlay from blocking interactions with the video */
 }
 
@@ -66,19 +66,31 @@ header {
   display: none; /* Hide overlay when it's not needed */
 }
 
-.overlay-content {
-  text-align: center;
+.thumbnail-container {
+  position: relative;
+  display: inline-block;
 }
 
 .next-video-thumbnail {
-  width: 120px;
+  width: 320px;
   height: auto;
-  margin-top: 10px;
+}
+
+.up-next-text {
+  font-size: 30px;
+  margin-bottom: 10px;
+  margin-left: 100px;
 }
 
 .countdown-timer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   font-size: 48px;
-  margin-top: 20px;
+  color: #fff;
+  padding: 10px;
+  border-radius: 50%;
 }
 
 
