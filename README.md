@@ -60,49 +60,49 @@ The video application has two views:
 
 **Autoplay Feature:**
 
-Videos are played automatically from the playlist.
+- Videos are played automatically from the playlist.
 
-After each video, a 5-second countdown is shown before the next video plays.
+- After each video, a 5-second countdown is shown before the next video plays.
 
-Countdown appears over the next video thumbnail.
+- Countdown appears over the next video thumbnail.
 
 **Loop through Playlist:**
 
-All videos play in a continuous loop after the last video finishes.
+- All videos play in a continuous loop after the last video finishes.
 
-On-screen Overlay Information:
+- On-screen Overlay Information:
 
-While a video is about to end, a countdown appears on the next video in the playlist.
+- While a video is about to end, a countdown appears on the next video in the playlist.
 
-The overlay includes information about the next video, such as the title and thumbnail.
+- The overlay includes information about the next video, such as the title and thumbnail.
 
 **Playing Status:**
 
-The current video playing has a "Playing" overlay on its thumbnail in the video list.
+- The current video playing has a "Playing" overlay on its thumbnail in the video list.
 
-The overlay appears only on the thumbnail, not on the description.
+- The overlay appears only on the thumbnail, not on the description.
 
-Dashboard Page Enhancements
+- Dashboard Page Enhancements
 
 **Visibility Management:**
 
-Videos fetched from both Wistia API and Rails API.
+- Videos fetched from both Wistia API and Rails API.
 
-Eye icon toggles visibility of videos, updating the Rails backend.
+- Eye icon toggles visibility of videos, updating the Rails backend.
 
 **Play Count:**
 
-Play count fetched from Wistia Stats API and displayed on each video.
+- Play count fetched from Wistia Stats API and displayed on each video.
 
-Integrated play count data with the Rails model to persist the information.
+- Integrated play count data with the Rails model to persist the information.
 
 **Tag Management:**
 
-Users can click a tag icon to add tags to a video.
+- Users can click a tag icon to add tags to a video.
 
-Tags are stored in the Rails backend.
+- Tags are stored in the Rails backend.
 
-Each video in the dashboard displays the associated tags.
+- Each video in the dashboard displays the associated tags.
 
 ## Implementation Highlights
 
@@ -144,7 +144,7 @@ Each video in the dashboard displays the associated tags.
 
 **Countdown Overlay:**
 
-Implemented countdown functionality to appear for the next video, positioned directly on the video thumbnail.
+- Implemented countdown functionality to appear for the next video, positioned directly on the video thumbnail.
 
 **Tag Management UI:**
 
@@ -169,6 +169,78 @@ Video data persisted on the Rails backend was enhanced to include visibility, pl
 **Rails for Backend-only API:**
 
 Using Rails API enabled seamless integration of video management features while keeping frontend and backend operations decoupled.
+
+## Design the database for “search by tag” for the owner dashboard
+1. Query to Print the Total Number of Videos with at Least 1 Play Count
+```
+SELECT COUNT(*) AS total_videos
+FROM videos
+WHERE play_count >= 1;
+```
+ActiveRecord ORM:
+```
+Video.where("play_count >= ?", 1).count
+```
+2. Schema(s) to Support Tags
+Raw SQL 
+```
+CREATE TABLE tags (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE video_tags (
+    id SERIAL PRIMARY KEY,
+    video_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW(),
+    FOREIGN KEY (video_id) REFERENCES videos(id),
+    FOREIGN KEY (tag_id) REFERENCES tags(id)
+);
+```
+ActiveRecord ORM
+```
+# Migration for tags
+class CreateTags < ActiveRecord::Migration[7.0]
+  def change
+    create_table :tags do |t|
+      t.string :name, null: false
+      t.timestamps
+    end
+  end
+end
+
+# Migration for video_tags
+class CreateVideoTags < ActiveRecord::Migration[7.0]
+  def change
+    create_table :video_tags do |t|
+      t.references :video, null: false, foreign_key: true
+      t.references :tag, null: false, foreign_key: true
+      t.timestamps
+    end
+  end
+end
+```
+3. Query to Find the Video with the Most Number of Tags
+```
+SELECT v.*
+FROM videos v
+JOIN video_tags vt ON v.id = vt.video_id
+GROUP BY v.id
+ORDER BY COUNT(vt.tag_id) DESC, v.created_at DESC
+LIMIT 1;
+```
+Active Record ORM
+```
+Video.joins(:tags)
+     .group("videos.id")
+     .order("COUNT(tags.id) DESC, videos.created_at DESC")
+     .limit(1)
+     .first
+```
 
 ## Performance Characteristics
 
@@ -196,6 +268,6 @@ To better manage UI states like visibility and playing status, a lightweight sta
 The backend could benefit from adding an external caching mechanism like Redis for frequently accessed video or tag data.
 
 
-*** Conclusion
+***Conclusion***
 
 This project provided a good opportunity to demonstrate full-stack integration, including working with third-party APIs, building a backend with Rails, and implementing a seamless video management experience with a responsive frontend.
