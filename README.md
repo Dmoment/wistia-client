@@ -158,6 +158,30 @@ The video application has two views:
 
 Combined Wistia and Rails API data for the playlist and dashboard to ensure visibility and play count data is synced and managed efficiently. From Rails API we are sending play_count, visible and hashed_id and other video data is coming from wistia API directly on frontend.
 
+```
+class Video < ApplicationRecord
+  has_many :video_tags
+  has_many :tags, through: :video_tags
+
+  def self.sync_with_wistia
+    wistia_service = WistiaService.new
+    wistia_videos = wistia_service.fetch_videos
+
+    wistia_videos.each do |wistia_video|
+      video = find_or_initialize_by(wistia_hash: wistia_video['hashed_id'])
+      play_count = wistia_service.fetch_video_stats(wistia_video['hashed_id'])['play_count']
+
+      video.update(
+        title: wistia_video['name'],
+        description: wistia_video['description'],
+        play_count: play_count || 0, # Set play_count to 0 if it's not available
+        visible: true
+      )
+    end
+  end
+end
+```
+
 **Countdown Implementation:**
 
 The countdown occurs during the final 5 seconds of a video and overlays the next video in the playlist. This provides a seamless transition for users.
