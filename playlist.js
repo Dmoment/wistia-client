@@ -2,8 +2,8 @@
 
 var currentVideoIndex = 0;
 var videoQueue = [];
-var countdownStarted = false;
-var countdownInterval = null; // To track the countdown interval
+var countdownStarted = false; // Declare countdownStarted globally
+var countdownInterval; // Variable to store the countdown interval ID
 
 var Playlist = {
   getRailsVideos: function() {
@@ -34,7 +34,7 @@ var Playlist = {
       });
   },
 
-  renderMedia: function(media, index) {
+  renderMedia: function(media) {
     var template = document.getElementById('media-template');
     var clone = template.content.cloneNode(true);
     var el = clone.children[0];
@@ -44,7 +44,7 @@ var Playlist = {
     el.querySelector('.duration').innerText = Utils.formatTime(media.duration);
     el.querySelector('.media-content').setAttribute('href', '#wistia_' + media.hashed_id);
     el.setAttribute('data-hashed-id', media.hashed_id);
-    el.setAttribute('data-index', index);
+    el.setAttribute('data-index', videoQueue.indexOf(media)); // Set the video index
 
     document.getElementById('medias').appendChild(el);
   },
@@ -59,16 +59,16 @@ var Playlist = {
   },
 
   loadAndPlayVideo: function(videoIndex) {
-    countdownStarted = false;
+    countdownStarted = false; // Reset countdown flag at the beginning of each video
 
-    var currentVideo = videoQueue[videoIndex];
-    currentVideoIndex = videoIndex; // Update the current video index
-
-    // Clear any ongoing countdowns
+    // Clear any active countdown interval and hide the countdown overlay
     if (countdownInterval) {
       clearInterval(countdownInterval);
-      countdownInterval = null;
+      document.getElementById('countdown-overlay').classList.add('hidden');
     }
+
+    currentVideoIndex = videoIndex; // Update the current video index
+    var currentVideo = videoQueue[videoIndex];
 
     // Update the Wistia embed container with the new video
     document.querySelector('.wistia_embed').className = `wistia_embed wistia_async_${currentVideo.hashed_id} playlistLinks=auto playlistLoop=true`;
@@ -89,6 +89,7 @@ var Playlist = {
           if (videoApi.duration() - t <= 5 && !countdownStarted) {
             countdownStarted = true;
 
+            // Update countdown overlay with the next video's info
             let nextVideoIndex = (currentVideoIndex + 1) % videoQueue.length;
             let nextVideo = videoQueue[nextVideoIndex];
             showCountdownOverlay(nextVideo, function() {
@@ -141,13 +142,17 @@ function showCountdownOverlay(nextVideo, callback) {
   let countdown = 5;
   countdownTimer.innerText = countdown;
 
+  // Clear any existing countdown interval to avoid multiple intervals
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+  }
+
   countdownInterval = setInterval(() => {
     countdown -= 1;
     countdownTimer.innerText = countdown;
 
     if (countdown === 0) {
       clearInterval(countdownInterval);
-      countdownInterval = null;
       countdownOverlay.classList.add('hidden');
       if (callback) {
         callback(); // Execute the callback to proceed with the next video when countdown ends
@@ -155,6 +160,19 @@ function showCountdownOverlay(nextVideo, callback) {
     }
   }, 1000);
 }
+
+// Event listener to handle manual video selection
+document.getElementById('medias').addEventListener('click', function(event) {
+  if (event.target.closest('.media-content')) {
+    event.preventDefault();
+
+    const videoEl = event.target.closest('.media');
+    if (videoEl) {
+      const videoIndex = parseInt(videoEl.getAttribute('data-index'), 10);
+      Playlist.loadAndPlayVideo(videoIndex);
+    }
+  }
+});
 
 (function() {
   document.addEventListener(
@@ -168,25 +186,12 @@ function showCountdownOverlay(nextVideo, callback) {
         }
 
         // Render the videos in the playlist
-        videoQueue.forEach(function(media, index) {
-          Playlist.renderMedia(media, index);
+        videoQueue.forEach(function(media) {
+          Playlist.renderMedia(media);
         });
 
         // Set up the playlist in the Wistia player
         Playlist.setupPlaylist();
-      });
-
-      // Event listener for manually clicking on a video in the list
-      document.getElementById('medias').addEventListener('click', function(event) {
-        if (event.target.closest('.media-content')) {
-          event.preventDefault();
-
-          const videoEl = event.target.closest('.media');
-          if (videoEl) {
-            const videoIndex = parseInt(videoEl.getAttribute('data-index'), 10);
-            Playlist.loadAndPlayVideo(videoIndex);
-          }
-        }
       });
     },
     false
