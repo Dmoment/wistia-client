@@ -2,7 +2,8 @@
 
 var currentVideoIndex = 0;
 var videoQueue = [];
-var countdownStarted = false; // Declare countdownStarted globally
+var countdownStarted = false;
+var countdownInterval = null; // To track the countdown interval
 
 var Playlist = {
   getRailsVideos: function() {
@@ -33,7 +34,7 @@ var Playlist = {
       });
   },
 
-  renderMedia: function(media) {
+  renderMedia: function(media, index) {
     var template = document.getElementById('media-template');
     var clone = template.content.cloneNode(true);
     var el = clone.children[0];
@@ -43,6 +44,7 @@ var Playlist = {
     el.querySelector('.duration').innerText = Utils.formatTime(media.duration);
     el.querySelector('.media-content').setAttribute('href', '#wistia_' + media.hashed_id);
     el.setAttribute('data-hashed-id', media.hashed_id);
+    el.setAttribute('data-index', index);
 
     document.getElementById('medias').appendChild(el);
   },
@@ -57,9 +59,16 @@ var Playlist = {
   },
 
   loadAndPlayVideo: function(videoIndex) {
-    countdownStarted = false; // Reset countdown flag at the beginning of each video
+    countdownStarted = false;
 
     var currentVideo = videoQueue[videoIndex];
+    currentVideoIndex = videoIndex; // Update the current video index
+
+    // Clear any ongoing countdowns
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
 
     // Update the Wistia embed container with the new video
     document.querySelector('.wistia_embed').className = `wistia_embed wistia_async_${currentVideo.hashed_id} playlistLinks=auto playlistLoop=true`;
@@ -72,15 +81,14 @@ var Playlist = {
         // Play the current video
         videoApi.play();
 
-         // Update UI to show "Playing" overlay for the current video in the list
-         Playlist.updatePlayingOverlay(currentVideo.hashed_id);
+        // Update UI to show "Playing" overlay for the current video in the list
+        Playlist.updatePlayingOverlay(currentVideo.hashed_id);
 
         // Bind to the timechange event to trigger countdown in the last 5 seconds
         videoApi.bind("timechange", function(t) {
           if (videoApi.duration() - t <= 5 && !countdownStarted) {
             countdownStarted = true;
 
-            // Update countdown overlay with the next video's info
             let nextVideoIndex = (currentVideoIndex + 1) % videoQueue.length;
             let nextVideo = videoQueue[nextVideoIndex];
             showCountdownOverlay(nextVideo, function() {
@@ -105,7 +113,7 @@ var Playlist = {
     document.querySelectorAll('.media-overlay').forEach(function(overlay) {
       overlay.classList.add('hidden');
     });
-  
+
     // Show "Playing" overlay for the currently playing video
     const currentMediaEl = document.querySelector(`[data-hashed-id="${currentHashedId}"]`);
     if (currentMediaEl) {
@@ -133,12 +141,13 @@ function showCountdownOverlay(nextVideo, callback) {
   let countdown = 5;
   countdownTimer.innerText = countdown;
 
-  const countdownInterval = setInterval(() => {
+  countdownInterval = setInterval(() => {
     countdown -= 1;
     countdownTimer.innerText = countdown;
 
     if (countdown === 0) {
       clearInterval(countdownInterval);
+      countdownInterval = null;
       countdownOverlay.classList.add('hidden');
       if (callback) {
         callback(); // Execute the callback to proceed with the next video when countdown ends
@@ -159,12 +168,25 @@ function showCountdownOverlay(nextVideo, callback) {
         }
 
         // Render the videos in the playlist
-        videoQueue.forEach(function(media) {
-          Playlist.renderMedia(media);
+        videoQueue.forEach(function(media, index) {
+          Playlist.renderMedia(media, index);
         });
 
         // Set up the playlist in the Wistia player
         Playlist.setupPlaylist();
+      });
+
+      // Event listener for manually clicking on a video in the list
+      document.getElementById('medias').addEventListener('click', function(event) {
+        if (event.target.closest('.media-content')) {
+          event.preventDefault();
+
+          const videoEl = event.target.closest('.media');
+          if (videoEl) {
+            const videoIndex = parseInt(videoEl.getAttribute('data-index'), 10);
+            Playlist.loadAndPlayVideo(videoIndex);
+          }
+        }
       });
     },
     false
