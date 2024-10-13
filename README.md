@@ -4,7 +4,7 @@
 
 The task was to enhance an existing lightweight video application with the Wistia API, including features for video playback and management using a Rails backend and a JavaScript/HTML/CSS frontend.
 
-- ***Video Overview:*** https://share.vidyard.com/watch/WMswkKtNnVo5iMoH665w18? (Recorder a video to showcase the working)
+- ***Video Overview:*** https://share.vidyard.com/watch/d6eg2kWoQ4J97VMRpJ5UgH? (Recorder a video to showcase the working)
 
 ## Setup and Run Instructions
 
