@@ -8,15 +8,15 @@ The task was to enhance an existing lightweight video application with the Wisti
 
 ## Setup and Run Instructions
 
-**Backend (Rails API):
+***Backend (Rails API):***
 
-Navigate to the api folder.
+- Navigate to the api folder.
 
-Run ```bundle install``` to install dependencies.
+- Run ```bundle install``` to install dependencies.
 
-Set up the database by running ```rails db:create db:migrate```.
+- Set up the database by running ```rails db:create db:migrate```.
 
-Start the Rails server with ```rails s```.
+- Start the Rails server with ```rails s```.
 
 ***Frontend (JavaScript Client):***
 
