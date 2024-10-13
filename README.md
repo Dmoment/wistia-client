@@ -66,11 +66,8 @@ The video application has two views:
 
 - Countdown appears over the next video thumbnail.
 
-**Loop through Playlist:**
 
-- All videos play in a continuous loop after the last video finishes.
-
-- On-screen Overlay Information:
+***On-screen Overlay Information:***
 
 - While a video is about to end, a countdown appears on the next video in the playlist.
 
@@ -115,28 +112,43 @@ The video application has two views:
 - Created an endpoint for updating visibility status.
 
 - Added tag associations to the index method to return tags for each video.
+
+- Added endpoint to create and link tag with associated video
 ```
 module Api
   module V1
     class VideosController < ApplicationController
+      before_action :find_video, only: [:update]
+
+      # GET /api/v1/videos
       def index
-        @videos = Video.includes(:tags).where(visible: true)
-        render json: @videos.to_json(include: :tags)
+        videos = Video.includes(:tags).where(visible: true)
+        render json: videos.to_json(include: :tags)
       end
 
+      # PATCH/PUT /api/v1/videos/:id
       def update
-        @video = Video.find_by(wistia_hash: params[:id])
+        return render_error('Video not found', :not_found) unless @video
+
         if @video.update(video_params)
-          render json: @video
+          render json: @video, status: :ok
         else
-          render json: @video.errors, status: :unprocessable_entity
+          render_error(@video.errors.full_messages, :unprocessable_entity)
         end
       end
 
       private
 
+      def find_video
+        @video = Video.find_by(wistia_hash: params[:id])
+      end
+
       def video_params
         params.require(:video).permit(:visible)
+      end
+
+      def render_error(message, status)
+        render json: { error: message }, status: status
       end
     end
   end
@@ -145,27 +157,45 @@ end
 module Api
   module V1
     class VideoTagsController < ApplicationController
-      def create
-        @video = Video.find_by(wistia_hash: params[:video_id])
-        @tag = Tag.find_or_create_by(name: params[:tag][:name])
+      before_action :find_video, only: [:create]
 
-        if @video && @tag
-          @video.tags << @tag unless @video.tags.include?(@tag)
-          render json: @tag, status: :created
+      def create
+        return render_error('Video not found', :not_found) unless @video
+
+        @tag = Tag.find_or_create_by(tag_params)
+
+        if @tag.persisted?
+          attach_tag_to_video(@video, @tag)
         else
-          render json: { error: 'Video or Tag not found' }, status: :unprocessable_entity
+          render_error('Failed to create or find tag', :unprocessable_entity)
         end
+      end
+
+      private
+
+      def find_video
+        @video = Video.find_by(wistia_hash: params[:video_id])
+      end
+
+      def tag_params
+        params.require(:tag).permit(:name)
+      end
+
+      def attach_tag_to_video(video, tag)
+        if video.tags.exclude?(tag)
+          video.tags << tag
+        end
+
+        render json: tag, status: :created
+      end
+
+      def render_error(message, status)
+        render json: { error: message }, status: status
       end
     end
   end
 end
 ```
-
-**TagsController:**
-
-- Endpoint to create new tags.
-
-- Managed linking of tags to videos.
 
 **Database Migrations:**
 
@@ -175,9 +205,14 @@ end
 
 **Wistia Sync:**
 
-- Added a rake task to sync videos with Wistia. (You can find the service which is used to fetch data from Wistia APIs here - services/WistiaService). There is a class method - sync_with_wistia in Video model which populates our DB videos table. We can have this rake task in scheduled job which can run after every 15-20 minutes so that we can have updated data.
+- Added a rake task to sync videos with Wistia. (You can find the service which is used to fetch data from Wistia APIs here - ```services/WistiaService```). There is a class method - ```sync_with_wistia``` in Video model which populates our DB videos table. We can have this rake task in scheduled job which can run after every 15-20 minutes so that we can have updated data.
 
 - Stored basic video information and updated play count from Wistia Stats API.
+
+***Unit test***
+- User ```rspec``` for unit testing
+- Added controller, model and service test cases
+- Added test case for ```WistiaService```
 
 **Frontend (JavaScript, HTML, CSS)**
 
@@ -189,7 +224,7 @@ end
 
 **Countdown Overlay:**
 
-- Implemented countdown functionality to appear for the next video, positioned directly on the video thumbnail.
+- Implemented countdown functionality to appear for the next video, positioned directly on the video thumbnail. This is done by an utility function ```showCountdownOverlay```.
 
 **Tag Management UI:**
 
@@ -205,24 +240,34 @@ Combined Wistia and Rails API data for the playlist and dashboard to ensure visi
 
 ```
 class Video < ApplicationRecord
-  has_many :video_tags
+  has_many :video_tags, dependent: :destroy
   has_many :tags, through: :video_tags
 
   def self.sync_with_wistia
     wistia_service = WistiaService.new
     wistia_videos = wistia_service.fetch_videos
 
-    wistia_videos.each do |wistia_video|
-      video = find_or_initialize_by(wistia_hash: wistia_video['hashed_id'])
-      play_count = wistia_service.fetch_video_stats(wistia_video['hashed_id'])['play_count']
-
-      video.update(
-        title: wistia_video['name'],
-        description: wistia_video['description'],
-        play_count: play_count || 0, # Set play_count to 0 if it's not available
-        visible: true
-      )
+    wistia_videos.each_slice(50) do |video_batch|
+      video_batch.each do |wistia_video|
+        sync_video_with_wistia(wistia_service, wistia_video)
+      end
     end
+  end
+
+  def self.sync_video_with_wistia(wistia_service, wistia_video)
+    video = find_or_create_by(wistia_hash: wistia_video['hashed_id'])
+    play_count_data = wistia_service.fetch_video_stats(wistia_video['hashed_id'])
+    play_count = play_count_data['play_count']
+
+    video.assign_attributes(
+      title: wistia_video['name'],
+      description: wistia_video['description'],
+      play_count: play_count || 0, # Set play_count to 0 if it's not available
+      visible: true
+    )
+
+    # Only save if changes were made
+    video.save if video.changed?
   end
 end
 ```
