@@ -73,12 +73,12 @@ ul#medias {
 .thumbnail-container {
   position: relative;
   display: inline-block;
-  margin-right: 10px;
 }
 
 .next-video-thumbnail {
-  width: 320px; /* Ensure thumbnail fills the container without overflowing */
+  width: 310px;
   height: auto;
+  border-radius: 8px;
 }
 
 .up-next-text {
