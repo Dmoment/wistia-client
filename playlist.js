@@ -6,22 +6,22 @@ var countdownStarted = false; // Declare countdownStarted globally
 var countdownInterval; // Variable to store the countdown interval ID
 
 var Playlist = {
-  getRailsVideos: function() {
+  getRailsVideos: function () {
     // Fetch video data from the Rails API to get visibility status
     var railsApiUrl = 'http://localhost:3000/api/v1/videos';
     return axios.get(railsApiUrl);
   },
 
-  getWistiaMedias: function() {
+  getWistiaMedias: function () {
     // Fetch video data from the Wistia API
     var url = new URL('https://api.wistia.com/v1/medias.json');
     return axios.get(String(url), { headers: { Authorization: `Bearer ${TOKEN}` } });
   },
 
-  fetchVideos: function() {
+  fetchVideos: function () {
     // Fetch videos from both APIs
     return Promise.all([Playlist.getRailsVideos(), Playlist.getWistiaMedias()])
-      .then(function([railsResponse, wistiaResponse]) {
+      .then(function ([railsResponse, wistiaResponse]) {
         const visibleVideos = railsResponse.data; // Data from Rails API
         const wistiaVideos = wistiaResponse.data; // Data from Wistia API
 
@@ -34,7 +34,7 @@ var Playlist = {
       });
   },
 
-  renderMedia: function(media) {
+  renderMedia: function (media) {
     var template = document.getElementById('media-template');
     var clone = template.content.cloneNode(true);
     var el = clone.children[0];
@@ -49,7 +49,7 @@ var Playlist = {
     document.getElementById('medias').appendChild(el);
   },
 
-  setupPlaylist: function() {
+  setupPlaylist: function () {
     if (videoQueue.length === 0) {
       return;
     }
@@ -58,7 +58,7 @@ var Playlist = {
     Playlist.loadAndPlayVideo(currentVideoIndex);
   },
 
-  loadAndPlayVideo: function(videoIndex) {
+  loadAndPlayVideo: function (videoIndex) {
     countdownStarted = false; // Reset countdown flag at the beginning of each video
 
     // Clear any active countdown interval and hide the countdown overlay
@@ -77,7 +77,7 @@ var Playlist = {
     window._wq = window._wq || [];
     _wq.push({
       id: currentVideo.hashed_id,
-      onReady: function(videoApi) {
+      onReady: function (videoApi) {
         // Play the current video
         videoApi.play();
 
@@ -85,23 +85,22 @@ var Playlist = {
         Playlist.updatePlayingOverlay(currentVideo.hashed_id);
 
         // Bind to the timechange event to trigger countdown in the last 5 seconds
-        videoApi.bind("timechange", function(t) {
+        videoApi.bind("timechange", function (t) {
           if (videoApi.duration() - t <= 5 && !countdownStarted) {
             countdownStarted = true;
 
-            // Update countdown overlay with the next video's info
-            let nextVideoIndex = (currentVideoIndex + 1) % videoQueue.length;
+            let nextVideoIndex = currentVideoIndex + 1;
             let nextVideo = videoQueue[nextVideoIndex];
-            showCountdownOverlay(nextVideo, function() {
+            showCountdownOverlay(nextVideo, function () {
               // After countdown ends, load the next video
-              currentVideoIndex = nextVideoIndex;
-              Playlist.loadAndPlayVideo(currentVideoIndex);
+              Playlist.loadAndPlayVideo(nextVideoIndex);
             });
+
           }
         });
 
-        // Unbind all events when video ends to avoid overlapping issues
-        videoApi.bind("end", function() {
+        // Bind the end event to handle when a video finishes playing
+        videoApi.bind("end", function () {
           videoApi.unbind("timechange");
           videoApi.unbind("end");
         });
@@ -109,18 +108,20 @@ var Playlist = {
     });
   },
 
-  updatePlayingOverlay: function(currentHashedId) {
+  updatePlayingOverlay: function (currentHashedId) {
     // Remove "Playing" overlay from all videos first
-    document.querySelectorAll('.media-overlay').forEach(function(overlay) {
+    document.querySelectorAll('.media-overlay').forEach(function (overlay) {
       overlay.classList.add('hidden');
     });
 
     // Show "Playing" overlay for the currently playing video
-    const currentMediaEl = document.querySelector(`[data-hashed-id="${currentHashedId}"]`);
-    if (currentMediaEl) {
-      const playingOverlay = currentMediaEl.querySelector('.thumbnail-container .media-overlay');
-      if (playingOverlay) {
-        playingOverlay.classList.remove('hidden');
+    if (currentHashedId) {
+      const currentMediaEl = document.querySelector(`[data-hashed-id="${currentHashedId}"]`);
+      if (currentMediaEl) {
+        const playingOverlay = currentMediaEl.querySelector('.thumbnail-container .media-overlay');
+        if (playingOverlay) {
+          playingOverlay.classList.remove('hidden');
+        }
       }
     }
   }
@@ -162,7 +163,7 @@ function showCountdownOverlay(nextVideo, callback) {
 }
 
 // Event listener to handle manual video selection
-document.getElementById('medias').addEventListener('click', function(event) {
+document.getElementById('medias').addEventListener('click', function (event) {
   if (event.target.closest('.media-content')) {
     event.preventDefault();
 
@@ -174,11 +175,11 @@ document.getElementById('medias').addEventListener('click', function(event) {
   }
 });
 
-(function() {
+(function () {
   document.addEventListener(
     'DOMContentLoaded',
-    function() {
-      Playlist.fetchVideos().then(function(visibleWistiaVideos) {
+    function () {
+      Playlist.fetchVideos().then(function (visibleWistiaVideos) {
         videoQueue = visibleWistiaVideos;
 
         if (videoQueue.length === 0) {
@@ -186,7 +187,7 @@ document.getElementById('medias').addEventListener('click', function(event) {
         }
 
         // Render the videos in the playlist
-        videoQueue.forEach(function(media) {
+        videoQueue.forEach(function (media) {
           Playlist.renderMedia(media);
         });
 
