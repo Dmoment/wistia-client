@@ -73,6 +73,7 @@ ul#medias {
 .thumbnail-container {
   position: relative;
   display: inline-block;
+  margin-right: 10px;
 }
 
 .next-video-thumbnail {

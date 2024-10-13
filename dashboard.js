@@ -1,63 +1,64 @@
 'use strict';
 
-var Dashboard = {
-  getMedias: function() {
-    var url = new URL('https://api.wistia.com/v1/medias.json');
-    return axios.get(String(url), { headers: { Authorization: `Bearer ${TOKEN}` } });
-  },
+// Constants for configuration
+const RAILS_API_URL = 'http://localhost:3000/api/v1/videos';
+const WISTIA_API_URL = 'https://api.wistia.com/v1/medias.json';
 
-  getRailsVideos: function() {
-    // Fetch video data from Rails API to get visibility status and tags
-    var railsApiUrl = 'http://localhost:3000/api/v1/videos';
-    return axios.get(railsApiUrl);
-  },
+// Dashboard object to manage videos and tags
+const Dashboard = {
+  // Fetch video data from Wistia API
+  getMedias: () => axios.get(WISTIA_API_URL, { headers: { Authorization: `Bearer ${TOKEN}` } }),
 
-  fetchVideos: function() {
-    // Fetch videos from both APIs
-    return Promise.all([Dashboard.getRailsVideos(), Dashboard.getMedias()])
-      .then(function([railsResponse, wistiaResponse]) {
-        const railsVideos = railsResponse.data; // Data from Rails API
-        const wistiaVideos = wistiaResponse.data; // Data from Wistia API
+  // Fetch video data from Rails API to get visibility status and tags
+  getRailsVideos: () => axios.get(RAILS_API_URL),
 
-        // Combine both data sets using the wistia_hash as the key
-        const combinedVideos = wistiaVideos.map(wistiaVideo => {
-          const railsVideo = railsVideos.find(video => video.wistia_hash === wistiaVideo.hashed_id);
-          return {
-            ...wistiaVideo,
-            visible: railsVideo ? railsVideo.visible : false,
-            playCount: railsVideo ? railsVideo.play_count : 0,
-            tags: railsVideo ? railsVideo.tags : [] // Include tags from Rails API
-          };
-        });
+  // Fetch videos from both APIs and merge them
+  fetchVideos: async () => {
+    try {
+      const [railsResponse, wistiaResponse] = await Promise.all([Dashboard.getRailsVideos(), Dashboard.getMedias()]);
+      const railsVideos = railsResponse.data;
+      const wistiaVideos = wistiaResponse.data;
 
-        return combinedVideos;
+      // Combine both data sets using the wistia_hash as the key
+      return wistiaVideos.map(wistiaVideo => {
+        const railsVideo = railsVideos.find(video => video.wistia_hash === wistiaVideo.hashed_id);
+        return {
+          ...wistiaVideo,
+          visible: railsVideo ? railsVideo.visible : false,
+          playCount: railsVideo ? railsVideo.play_count : 0,
+          tags: railsVideo ? railsVideo.tags : []
+        };
       });
+    } catch (error) {
+      console.error('Failed to fetch videos:', error);
+      return [];
+    }
   },
 
-  renderTag: function(mediaEl, tag) {
-    var template = document.getElementById('tag-template');
-    var clone = template.content.cloneNode(true);
-    var tagEl = clone.children[0];
-
-    tagEl.innerText = tag.name; // Updated to show tag name from Rails API
+  // Render a single tag
+  renderTag: (mediaEl, tag) => {
+    const template = document.getElementById('tag-template');
+    const clone = template.content.cloneNode(true);
+    const tagEl = clone.children[0];
+    tagEl.innerText = tag.name;
     mediaEl.querySelector('.tags').append(tagEl);
   },
 
-  renderTags: function(mediaEl, tags) {
-    tags.forEach(function(tag) {
-      Dashboard.renderTag(mediaEl, tag);
-    });
+  // Render tags for a media element
+  renderTags: (mediaEl, tags) => {
+    tags.forEach(tag => Dashboard.renderTag(mediaEl, tag));
   },
 
-  renderMedia: function(media) {
-    var template = document.getElementById('media-template');
-    var clone = template.content.cloneNode(true);
-    var el = clone.children[0];
+  // Render a media item
+  renderMedia: media => {
+    const template = document.getElementById('media-template');
+    const clone = template.content.cloneNode(true);
+    const el = clone.children[0];
 
     el.querySelector('.thumbnail').setAttribute('src', media.thumbnail.url);
     el.querySelector('.title').innerText = media.name;
     el.querySelector('.duration').innerText = Utils.formatTime(media.duration);
-    el.querySelector('.count').innerText = media.playCount; // Handle undefined stats
+    el.querySelector('.count').innerText = media.playCount;
     el.setAttribute('data-hashed-id', media.hashed_id);
 
     // Set visibility icon
@@ -71,104 +72,85 @@ var Dashboard = {
       hiddenIcon.style.display = 'inline';
     }
 
-    this.renderTags(el, media.tags || []); // Render associated tags
-
+    Dashboard.renderTags(el, media.tags || []);
     document.getElementById('medias').appendChild(el);
   },
 
-  toggleVisibility: function(hashedId) {
-    // Get video element and toggle visibility icon
+  // Toggle visibility of a media item
+  toggleVisibility: async hashedId => {
     const videoEl = document.querySelector(`[data-hashed-id="${hashedId}"]`);
     const visibleIcon = videoEl.querySelector('.media--visible');
     const hiddenIcon = videoEl.querySelector('.media--hidden');
-
-    // Determine new visibility status
     const isCurrentlyVisible = visibleIcon.style.display === 'inline';
     const newVisibility = !isCurrentlyVisible;
 
-    // Update the visibility status on the Rails backend
-    axios
-      .patch(`http://localhost:3000/api/v1/videos/${hashedId}`, {
-        video: { visible: newVisibility }
-      })
-      .then(response => {
-        // Update UI based on the new visibility status
-        if (newVisibility) {
-          visibleIcon.style.display = 'inline';
-          hiddenIcon.style.display = 'none';
-        } else {
-          visibleIcon.style.display = 'none';
-          hiddenIcon.style.display = 'inline';
-        }
-      })
-      .catch(error => {
-        console.error('Failed to update visibility:', error);
-      });
+    try {
+      await axios.patch(`${RAILS_API_URL}/${hashedId}`, { video: { visible: newVisibility } });
+      if (newVisibility) {
+        visibleIcon.style.display = 'inline';
+        hiddenIcon.style.display = 'none';
+      } else {
+        visibleIcon.style.display = 'none';
+        hiddenIcon.style.display = 'inline';
+      }
+    } catch (error) {
+      console.error('Failed to update visibility:', error);
+    }
   },
 
-  openModal: function(videoId) {
-    document.querySelector('.modal').classList.add('modal--open');
-    document.querySelector('.modal').setAttribute('data-video-id', videoId);
+  // Open the tag modal for a media item
+  openModal: videoId => {
+    const modal = document.querySelector('.modal');
+    modal.classList.add('modal--open');
+    modal.setAttribute('data-video-id', videoId);
   },
 
-  closeModal: function() {
+  // Close the tag modal
+  closeModal: () => {
     document.querySelector('.modal').classList.remove('modal--open');
   },
 
-  addTag: function(videoId, tagName) {
-    axios
-      .post(`http://localhost:3000/api/v1/videos/${videoId}/video_tags`, {
-        tag: { name: tagName }
-      })
-      .then(function(response) {
-        Dashboard.closeModal();
+  // Add a tag to a media item
+  addTag: async (videoId, tagName) => {
+    try {
+      const response = await axios.post(`${RAILS_API_URL}/${videoId}/video_tags`, { tag: { name: tagName } });
+      Dashboard.closeModal();
 
-        // Add the tag to the appropriate video on the UI
-        const videoEl = document.querySelector(`[data-hashed-id="${videoId}"]`);
-        if (videoEl) {
-          Dashboard.renderTag(videoEl, response.data);
-        }
-      })
-      .catch(function(error) {
-        console.error('Failed to add tag:', error);
-      });
+      // Add the tag to the appropriate video on the UI
+      const videoEl = document.querySelector(`[data-hashed-id="${videoId}"]`);
+      if (videoEl) {
+        Dashboard.renderTag(videoEl, response.data);
+      }
+    } catch (error) {
+      console.error('Failed to add tag:', error);
+    }
   }
 };
 
+// Event listeners
 (function() {
-  document.addEventListener(
-    'DOMContentLoaded',
-    function() {
-      Dashboard.fetchVideos().then(function(combinedVideos) {
-        combinedVideos.map(function(media) {
-          Dashboard.renderMedia(media);
-        });
-      });
-    },
-    { useCapture: false }
-  );
+  document.addEventListener('DOMContentLoaded', async () => {
+    const combinedVideos = await Dashboard.fetchVideos();
+    combinedVideos.forEach(media => Dashboard.renderMedia(media));
+  });
 
-  document.addEventListener(
-    'click',
-    function(event) {
-      if (event && event.target.matches('.visibility-toggle')) {
-        const hashedId = event.target.closest('.media').getAttribute('data-hashed-id');
-        Dashboard.toggleVisibility(hashedId);
-      }
+  document.addEventListener('click', event => {
+    if (event.target.matches('.visibility-toggle')) {
+      const hashedId = event.target.closest('.media').getAttribute('data-hashed-id');
+      Dashboard.toggleVisibility(hashedId);
+    }
 
-      if (event && event.target.matches('.tag-button')) {
-        const videoId = event.target.closest('.media').getAttribute('data-hashed-id');
-        Dashboard.openModal(videoId);
-      }
+    if (event.target.matches('.tag-button')) {
+      const videoId = event.target.closest('.media').getAttribute('data-hashed-id');
+      Dashboard.openModal(videoId);
+    }
 
-      if (event && event.target.matches('.modal__button--close')) {
-        Dashboard.closeModal();
-      }
-    },
-    { useCapture: true }
-  );
+    if (event.target.matches('.modal__button--close')) {
+      Dashboard.closeModal();
+    }
+  });
 
-  document.getElementById('tag-form').addEventListener('submit', function(event) {
+  document.getElementById('tag-form').addEventListener('submit', event => {
     event.preventDefault();
 
     const tagName = document.getElementById('tag-name').value.trim();
